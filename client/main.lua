@@ -1,6 +1,6 @@
 local config = require 'config.client'
 local nitrousActivated = false
-local nitrousBoost = config.nitrousBoost 
+local nitrousBoost = config.nitrousBoost
 local Fxs = {}
 local nitroDelay = false
 
@@ -19,6 +19,10 @@ RegisterNetEvent('qbx_nitro:client:LoadNitrous', function()
         return exports.qbx_core:Notify(locale('notify.not_in_vehicle'), 'error')
     end
 
+    if config.turboRequired and not IsToggleModOn(cache.vehicle, 18) then
+        return exports.qbx_core:Notify(locale('notify.need_turbo'), 'error')
+    end
+    
     if cache.seat ~= -1 then
         return exports.qbx_core:Notify(locale('notify.must_be_driver'), "error")
     end
@@ -44,6 +48,7 @@ local function nitrousUseLoop()
         nitroDelay = false
     end)
     CreateThread(function()
+        local Plate = trim(GetVehicleNumberPlateText(cache.vehicle))
         while nitrousActivated and cache.vehicle do
             if Entity(cache.vehicle).state.nitro - 0.25 >= 0 then
                 SetVehicleEnginePowerMultiplier(cache.vehicle, nitrousBoost)
@@ -52,12 +57,11 @@ local function nitrousUseLoop()
                 Entity(cache.vehicle).state:set("nitro", Entity(cache.vehicle).state.nitro - 0.25, true)
             else
                 SetVehicleBoostActive(cache.vehicle, 0)
-                SetVehicleEnginePowerMultiplier(cache.vehicle, LastEngineMultiplier)
+                SetVehicleEnginePowerMultiplier(cache.vehicle, 1.0)
                 SetVehicleEngineTorqueMultiplier(cache.vehicle, 1.0)
                 for index, _ in pairs(Fxs) do
                     StopParticleFxLooped(Fxs[index], 1)
-                    TriggerServerEvent('qbx_nitro:server:StopSync',
-                        trim(GetVehicleNumberPlateText(cache.vehicle)))
+                    TriggerServerEvent('qbx_nitro:server:StopSync', Plate)
                     Fxs[index] = nil
                 end
                 StopScreenEffect("RaceTurbo")
@@ -66,11 +70,11 @@ local function nitrousUseLoop()
             end
             if IsControlJustReleased(0, 36) and cache.seat == -1 then
                 SetVehicleBoostActive(cache.vehicle, 0)
-                SetVehicleEnginePowerMultiplier(cache.vehicle, LastEngineMultiplier)
+                SetVehicleEnginePowerMultiplier(cache.vehicle, 1.0)
                 SetVehicleEngineTorqueMultiplier(cache.vehicle, 1.0)
                 for index, _ in pairs(Fxs) do
                     StopParticleFxLooped(Fxs[index], 1)
-                    TriggerServerEvent('qbx_nitro:server:StopSync', trim(GetVehicleNumberPlateText(veh)))
+                    TriggerServerEvent('qbx_nitro:server:StopSync', Plate)
                     Fxs[index] = nil
                 end
                 StopScreenEffect("RaceTurbo")
@@ -102,7 +106,7 @@ local function nitrousLoop()
 end
 
 lib.onCache('vehicle', function(vehicle)
-    if vehicle then
+    if vehicle and (not config.turboRequired or IsToggleModOn(vehicle, 18)) then
         SetTimeout(750, function()
             nitrousLoop()
         end)
